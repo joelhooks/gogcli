@@ -9,6 +9,10 @@ Minimal Google CLI in Go for:
 
 ## Install / Build
 
+Install via Homebrew (tap):
+
+- `brew install steipete/tap/gogcli`
+
 Build locally:
 
 - `go build -o ./bin/gog ./cmd/gog`
