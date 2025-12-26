@@ -1,3 +1,10 @@
+---
+summary: "Refactor options (next wins)"
+read_when:
+  - Planning cleanup work
+  - Touching retry/logging/output plumbing
+---
+
 # Refactor options (next wins)
 
 Small wins
@@ -16,4 +23,3 @@ Bigger wins
 
 - API client retry unification: one retry stack (transport vs explicit); delete the other; push logs behind `--verbose`.
 - Command grouping / UX: consolidate “download/export” story; ensure help text + flags match across services.
-

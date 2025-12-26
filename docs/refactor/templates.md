@@ -1,3 +1,10 @@
+---
+summary: "googleauth templates via `//go:embed`"
+read_when:
+  - Editing auth UI
+  - Touching template parsing/escaping issues
+---
+
 # googleauth templates (embed)
 
 Problem: huge `templates*.go` files, noisy diffs, hard to edit.
@@ -16,5 +23,4 @@ Problem: huge `templates*.go` files, noisy diffs, hard to edit.
 ## Editing flow
 
 - Edit the HTML files directly.
-- Run `make test` (or `go test ./...`) to confirm templates still parse + handlers still render.
-
+- Run `go test ./...` to confirm templates parse + execute (tests cover this).

@@ -1,11 +1,18 @@
+---
+summary: "Drive-backed export commands (Docs/Slides/Sheets)"
+read_when:
+  - Adding a new Drive-backed export command
+  - Changing `--format` / `--out` behavior
+---
+
 # Exports (Drive-backed)
 
-Goal: one implementation for “export Google *Thing* via Drive” commands.
+Goal: one implementation for “export Google *Thing* via Drive”.
 
 ## Current pattern
 
 - Shared builder: `internal/cmd/export_via_drive.go:newExportViaDriveCmd`
-- Shared download: `internal/cmd/drive_download.go:downloadDriveFile` (handles Drive “native” exports + normal files)
+- Shared download: `internal/cmd/drive.go:downloadDriveFile` (handles Drive “native” exports + normal files)
 
 Each service command is a thin wrapper:
 
@@ -17,7 +24,8 @@ Each service command is a thin wrapper:
 
 - Arg is always the Drive file id (Doc/Sheet/Slides id).
 - Type guard: compare `mimeType` and error with `file is not a <KindLabel> (mimeType="...")`.
-- `--out` defaults to the gogcli config dir; `--out` can be dir or explicit file path (via existing Drive download logic).
+- `--out` defaults to `$(os.UserConfigDir())/gogcli/drive-downloads/` (via `internal/config:EnsureDriveDownloadsDir`).
+- `--out` can be dir or explicit file path (via `internal/cmd/drive_download_helpers.go:resolveDriveDownloadDestPath`).
 - Output
   - `--json`: `{ "path": "...", "size": <bytes> }`
   - text: `path\t...` / `size\t...`
@@ -27,4 +35,3 @@ Each service command is a thin wrapper:
 1) Pick expected Drive mime type + allowed formats.
 2) Add a new `newXExportCmd` calling `newExportViaDriveCmd(...)`.
 3) Add/extend tests in `internal/cmd/execute_drive_*_test.go` style (fake Drive server).
-

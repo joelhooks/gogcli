@@ -1,3 +1,10 @@
+---
+summary: "Output helpers (tables + paging)"
+read_when:
+  - Adding/changing list commands
+  - Touching pagination output
+---
+
 # Output helpers (tables + paging)
 
 Goal: kill copy/paste; keep output consistent.
@@ -20,4 +27,3 @@ Use `internal/cmd/output_helpers.go:printNextPageHint(u, token)`:
 
 - prints to stderr
 - exact format (tests depend on it): `# Next page: --page <token>`
-
