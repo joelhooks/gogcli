@@ -245,6 +245,46 @@ func normalize(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
 }
 
+// ErrKeychainLocked indicates the keychain is locked and cannot be unlocked interactively.
+var ErrKeychainLocked = errors.New("keychain is locked and no TTY available for password prompt")
+
+// EnsureKeychainAccess verifies keychain accessibility by performing a write/delete test.
+// On macOS, this triggers the unlock prompt if needed, failing early before the user
+// completes a long OAuth flow only to find the token can't be stored.
+func EnsureKeychainAccess() error {
+	if runtime.GOOS != "darwin" {
+		return nil
+	}
+
+	store, err := OpenDefault()
+	if err != nil {
+		return err
+	}
+
+	ks, ok := store.(*KeyringStore)
+	if !ok {
+		return nil
+	}
+
+	testKey := "_gog_keychain_test"
+	if err := ks.ring.Set(keyring.Item{
+		Key:  testKey,
+		Data: []byte("test"),
+	}); err != nil {
+		// Check for common keychain locked errors
+		errStr := err.Error()
+		if strings.Contains(errStr, "-25308") || // User Interaction is not allowed
+			strings.Contains(errStr, "locked") ||
+			strings.Contains(errStr, "interaction not allowed") {
+			return fmt.Errorf("%w\n\nTo unlock manually, run:\n  security unlock-keychain ~/Library/Keychains/login.keychain-db", ErrKeychainLocked)
+		}
+		return err
+	}
+
+	_ = ks.ring.Remove(testKey)
+	return nil
+}
+
 const defaultAccountKey = "default_account"
 
 func (s *KeyringStore) GetDefaultAccount() (string, error) {
