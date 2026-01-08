@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/api/calendar/v3"
 	"google.golang.org/api/option"
@@ -207,6 +208,64 @@ func TestCalendarSearchCmd_WithTimeRange(t *testing.T) {
 	if len(parsed.Events) != 1 {
 		t.Fatalf("expected 1 event, got %d", len(parsed.Events))
 	}
+}
+
+func TestCalendarSearchCmd_FromOnly_DefaultsTo90Days(t *testing.T) {
+	origNew := newCalendarService
+	t.Cleanup(func() { newCalendarService = origNew })
+
+	srv := httptest.NewServer(withPrimaryCalendar(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/events") && r.Method == http.MethodGet {
+			timeMin := r.URL.Query().Get("timeMin")
+			timeMax := r.URL.Query().Get("timeMax")
+			minTime, err := time.Parse(time.RFC3339, timeMin)
+			if err != nil {
+				t.Errorf("invalid timeMin: %v", err)
+			}
+			maxTime, err := time.Parse(time.RFC3339, timeMax)
+			if err != nil {
+				t.Errorf("invalid timeMax: %v", err)
+			}
+			if !maxTime.After(minTime) {
+				t.Errorf("expected timeMax after timeMin, got %s <= %s", timeMax, timeMin)
+			}
+			diff := maxTime.Sub(minTime)
+			if diff < 85*24*time.Hour || diff > 100*24*time.Hour {
+				t.Errorf("unexpected range: %s (min %s max %s)", diff, timeMin, timeMax)
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"items": []map[string]any{},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	})))
+	defer srv.Close()
+
+	svc, err := calendar.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newCalendarService = func(context.Context, string) (*calendar.Service, error) { return svc, nil }
+
+	_ = captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute([]string{
+				"--json",
+				"--account", "a@b.com",
+				"calendar", "search", "meeting",
+				"--from", "today",
+			}); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
 }
 
 func TestCalendarSearchCmd_TableOutput(t *testing.T) {

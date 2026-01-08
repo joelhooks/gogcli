@@ -362,6 +362,7 @@ gog calendar events <calendarId> --from 2025-01-01T00:00:00Z --to 2025-01-08T00:
 gog calendar events --all             # Fetch events from all calendars
 gog calendar event <calendarId> <eventId>
 gog calendar search "meeting" --today
+gog calendar search "meeting" --days 365
 gog calendar search "meeting" --from 2025-01-01T00:00:00Z --to 2025-01-31T00:00:00Z --max 50
 
 # Team calendars (requires Cloud Identity API for Google Workspace)

@@ -250,7 +250,7 @@ func (c *CalendarTeamCmd) runEvents(ctx context.Context, svc *calendar.Service, 
 				}
 
 				start, end := formatEventTime(ev, tr.Location)
-				startTime := parseEventStart(ev)
+				startTime := parseEventStart(ev, tr.Location)
 
 				mu.Lock()
 				events = append(events, teamEvent{
@@ -341,7 +341,7 @@ func formatEventTime(ev *calendar.Event, loc *time.Location) (start, end string)
 	return
 }
 
-func parseEventStart(ev *calendar.Event) time.Time {
+func parseEventStart(ev *calendar.Event, loc *time.Location) time.Time {
 	if ev.Start == nil {
 		return time.Time{}
 	}
@@ -351,7 +351,7 @@ func parseEventStart(ev *calendar.Event) time.Time {
 		}
 	}
 	if ev.Start.Date != "" {
-		if t, err := time.Parse("2006-01-02", ev.Start.Date); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", ev.Start.Date, loc); err == nil {
 			return t
 		}
 	}

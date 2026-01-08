@@ -18,6 +18,7 @@ type CalendarSearchCmd struct {
 	To         string `name:"to" help:"End time (RFC3339, date, or relative; default: 90 days from now)"`
 	Today      bool   `name:"today" help:"Search today only (timezone-aware)"`
 	Week       bool   `name:"week" help:"Search this week Mon-Sun (timezone-aware)"`
+	Days       int    `name:"days" help:"Search next N days (timezone-aware)" default:"0"`
 	CalendarID string `name:"calendar" help:"Calendar ID" default:"primary"`
 	Max        int64  `name:"max" aliases:"limit" help:"Max results" default:"25"`
 }
@@ -41,13 +42,14 @@ func (c *CalendarSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 	var from, to string
 
 	// If convenience flags are used, use timezone-aware resolution
-	if c.Today || c.Week || c.From != "" || c.To != "" {
+	if c.Today || c.Week || c.Days > 0 {
 		var timeRange *TimeRange
 		timeRange, err = ResolveTimeRange(ctx, svc, TimeRangeFlags{
 			From:  c.From,
 			To:    c.To,
 			Today: c.Today,
 			Week:  c.Week,
+			Days:  c.Days,
 		})
 		if err != nil {
 			return err
@@ -61,8 +63,26 @@ func (c *CalendarSearchCmd) Run(ctx context.Context, flags *RootFlags) error {
 			return err
 		}
 		now := time.Now().In(loc)
-		from = now.Add(-30 * 24 * time.Hour).Format(time.RFC3339)
-		to = now.Add(90 * 24 * time.Hour).Format(time.RFC3339)
+
+		if strings.TrimSpace(c.From) != "" {
+			parsedFrom, parseErr := parseTimeExpr(c.From, now, loc)
+			if parseErr != nil {
+				return fmt.Errorf("invalid --from: %w", parseErr)
+			}
+			from = parsedFrom.Format(time.RFC3339)
+		} else {
+			from = now.Add(-30 * 24 * time.Hour).Format(time.RFC3339)
+		}
+
+		if strings.TrimSpace(c.To) != "" {
+			parsedTo, parseErr := parseTimeExpr(c.To, now, loc)
+			if parseErr != nil {
+				return fmt.Errorf("invalid --to: %w", parseErr)
+			}
+			to = parsedTo.Format(time.RFC3339)
+		} else {
+			to = now.Add(90 * 24 * time.Hour).Format(time.RFC3339)
+		}
 	}
 
 	call := svc.Events.List(c.CalendarID).

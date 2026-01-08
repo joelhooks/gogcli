@@ -50,9 +50,9 @@ func TestReadConfig_JSON5(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ConfigPath: %v", err)
 	}
-	err = os.MkdirAll(filepath.Dir(path), 0o700)
-	if err != nil {
-		t.Fatalf("mkdir: %v", err)
+
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o700); mkErr != nil {
+		t.Fatalf("mkdir: %v", mkErr)
 	}
 
 	data := `{
@@ -60,17 +60,16 @@ func TestReadConfig_JSON5(t *testing.T) {
   keyring_backend: "file",
 }`
 
-	err = os.WriteFile(path, []byte(data), 0o600)
-	if err != nil {
-		t.Fatalf("write config: %v", err)
+	if writeErr := os.WriteFile(path, []byte(data), 0o600); writeErr != nil {
+		t.Fatalf("write config: %v", writeErr)
 	}
 
 	cfg, err := ReadConfig()
 	if err != nil {
 		t.Fatalf("ReadConfig: %v", err)
 	}
-	got := strings.TrimSpace(cfg.KeyringBackend)
-	if got != "file" {
+
+	if got := strings.TrimSpace(cfg.KeyringBackend); got != "file" {
 		t.Fatalf("expected keyring_backend=file, got %q", got)
 	}
 }

@@ -152,7 +152,12 @@ func parseTimeExpr(expr string, now time.Time, loc *time.Location) (time.Time, e
 
 // parseWeekday parses weekday expressions like "monday", "next tuesday"
 func parseWeekday(expr string, now time.Time) (time.Time, bool) {
-	expr = strings.TrimPrefix(expr, "next ")
+	expr = strings.TrimSpace(expr)
+	next := false
+	if strings.HasPrefix(expr, "next ") {
+		next = true
+		expr = strings.TrimPrefix(expr, "next ")
+	}
 
 	weekdays := map[string]time.Weekday{
 		"sunday":    time.Sunday,
@@ -178,10 +183,13 @@ func parseWeekday(expr string, now time.Time) (time.Time, bool) {
 
 	currentDay := now.Weekday()
 	daysUntil := int(targetDay) - int(currentDay)
-	if daysUntil <= 0 {
+	if daysUntil < 0 || (daysUntil == 0 && next) {
 		daysUntil += 7 // Next week
 	}
 
+	if daysUntil == 0 {
+		return startOfDay(now), true
+	}
 	return startOfDay(now.AddDate(0, 0, daysUntil)), true
 }
 
