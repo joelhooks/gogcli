@@ -1,10 +1,11 @@
 # 🧭 gogcli — Google in your terminal.
 
-Google in your terminal - CLI for Gmail, Calendar, Drive, Contacts, Tasks, Sheets, and Keep (Workspace-only).
+Google in your terminal — CLI for Gmail, Calendar, Drive, Docs, Slides, Sheets, Contacts, Tasks, People, Groups (Workspace), and Keep (Workspace-only).
 
 ## Features
 
 - **Gmail** - search threads, send emails, manage labels, drafts, filters, delegation, vacation settings, and watch (Pub/Sub push)
+- **Email tracking** - track opens for `gog gmail send --track` with a small Cloudflare Worker backend
 - **Calendar** - list/create/update events, detect conflicts, manage invitations, check free/busy status, team calendars
 - **Drive** - list/search/upload/download files, manage permissions, organize folders
 - **Contacts** - search/create/update contacts, access Workspace directory
@@ -14,8 +15,8 @@ Google in your terminal - CLI for Gmail, Calendar, Drive, Contacts, Tasks, Sheet
 - **People** - access profile information
 - **Keep (Workspace only)** - list/get/search notes and download attachments (service account + domain-wide delegation)
 - **Groups** - list groups you belong to, view group members (Google Workspace)
-- **Multiple account support** - manage multiple Google accounts simultaneously
-- **Secure credential storage** using OS keyring (Keychain on macOS, Secret Service on Linux, Credential Manager on Windows)
+- **Multiple accounts** - manage multiple Google accounts simultaneously
+- **Secure credential storage** using OS keyring or encrypted on-disk keyring (configurable)
 - **Auto-refreshing tokens** - authenticate once, use indefinitely
 - **Parseable output** - JSON mode for scripting and automation
 
@@ -46,9 +47,8 @@ Help:
 - `gog --help` shows top-level command groups.
 - Drill down with `gog <group> --help` (and deeper subcommands).
 - For the full expanded command list: `GOG_HELP=full gog --help`.
-- Make shortcut: `make gogcli -- --help` (or `make gogcli -- gmail --help`).
-- `make gogcli-help` shows CLI help (note: `make gogcli --help` is Make’s own help).
-- Gmail settings: `gog gmail settings --help` (old paths like `gog gmail watch ...` still work).
+- Make shortcut: `make gog -- --help` (or `make gog -- gmail --help`).
+- `make gog-help` shows CLI help (note: `make gog --help` is Make’s own help; use `--`).
 
 ## Quick Start
 
@@ -93,6 +93,67 @@ This will open a browser window for OAuth authorization. The refresh token is st
 export GOG_ACCOUNT=you@gmail.com
 gog gmail labels list
 ```
+
+## Authentication & Secrets
+
+### Accounts and tokens
+
+`gog` stores your OAuth refresh tokens in a “keyring” backend. Default is `auto` (best available backend for your OS/environment).
+
+List accounts:
+
+```bash
+gog auth list
+```
+
+Verify tokens are usable (helps spot revoked/expired tokens):
+
+```bash
+gog auth list --check
+```
+
+Show current auth state/services for the active account:
+
+```bash
+gog auth status
+```
+
+### Keyring backend: Keychain vs encrypted file
+
+Backends:
+
+- `auto` (default): picks the best backend for the platform.
+- `keychain`: macOS Keychain (recommended on macOS; avoids password management).
+- `file`: encrypted on-disk keyring (requires a password).
+
+Set backend via command (writes `keyring_backend` into `config.json`):
+
+```bash
+gog auth keyring file
+gog auth keyring keychain
+gog auth keyring auto
+```
+
+Show current backend + source (env/config/default) and config path:
+
+```bash
+gog auth keyring
+```
+
+Non-interactive runs (CI/ssh): file backend requires `GOG_KEYRING_PASSWORD`.
+
+```bash
+export GOG_KEYRING_PASSWORD='...'
+gog --no-input auth status
+```
+
+Force backend via env (overrides config):
+
+```bash
+export GOG_KEYRING_BACKEND=file
+```
+
+Precedence: `GOG_KEYRING_BACKEND` env var overrides `config.json`.
 
 ## Configuration
 
@@ -177,16 +238,16 @@ gog keep get <noteId> --account you@yourdomain.com
 - `GOG_JSON` - Default JSON output
 - `GOG_PLAIN` - Default plain output
 - `GOG_COLOR` - Color mode: `auto` (default), `always`, or `never`
-- `GOG_KEYRING_BACKEND` - Force keyring backend: `auto` (default), `keychain`, or `file` (use `file` to avoid Keychain prompts; pair with `GOG_KEYRING_PASSWORD`)
-- `GOG_KEYRING_PASSWORD` - Password for encrypted on-disk keyring (Linux/WSL/container environments without OS keychain)
 
 ### Config File (JSON5)
 
-Config file path:
+Find the actual config path in `gog --help` or `gog auth keyring`.
 
-```
-$(os.UserConfigDir())/gogcli/config.json
-```
+Typical paths:
+
+- macOS: `~/Library/Application Support/gogcli/config.json`
+- Linux: `~/.config/gogcli/config.json` (or `$XDG_CONFIG_HOME/gogcli/config.json`)
+- Windows: `%AppData%\\gogcli\\config.json`
 
 Example (JSON5 supports comments and trailing commas):
 
@@ -241,7 +302,11 @@ Flag aliases:
 gog auth credentials <path>           # Store OAuth client credentials
 gog auth add <email>                  # Authorize and store refresh token
 gog auth keep <email> --key <path>    # Configure service account for Keep (Workspace only)
+gog auth keyring [backend]            # Show/set keyring backend (auto|keychain|file)
+gog auth status                       # Show current auth state/services
+gog auth services                     # List available services and OAuth scopes
 gog auth list                         # List stored accounts
+gog auth list --check                 # Validate stored refresh tokens
 gog auth remove <email>               # Remove a stored refresh token
 gog auth manage                       # Open accounts manager in browser
 gog auth tokens                       # Manage stored refresh tokens
@@ -790,13 +855,15 @@ After installing completions, start a new shell session for changes to take effe
 
 ## Development
 
-After cloning, install git hooks:
+After cloning, install tools and (optionally) git hooks:
 
 ```bash
-make setup
+make tools
+lefthook install
 ```
 
 This installs [lefthook](https://github.com/evilmartians/lefthook) pre-commit and pre-push hooks for linting and testing.
+Install lefthook once: `brew install lefthook` (or use your package manager).
 
 Pinned tools (installed into `.tools/`):
 
@@ -823,12 +890,12 @@ Tip: if you want to avoid macOS Keychain prompts during these runs, set `GOG_KEY
 Build and run:
 
 ```bash
-make gog ARGS='auth add you@gmail.com'
+make gog auth add you@gmail.com
 ```
 
 For clean stdout when scripting:
 
-- `make gog ARGS='--json gmail search "from:me"' | jq .`
+- Use `--` when the first arg is a flag: `make gog -- --json gmail search "from:me" | jq .`
 
 ## License
 
