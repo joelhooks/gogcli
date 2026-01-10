@@ -12,7 +12,7 @@ func TestBuildRFC822Plain(t *testing.T) {
 		To:      []string{"c@d.com"},
 		Subject: "Hi",
 		Body:    "Hello",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -34,7 +34,7 @@ func TestBuildRFC822HTMLOnly(t *testing.T) {
 		To:       []string{"c@d.com"},
 		Subject:  "Hi",
 		BodyHTML: "<p>Hello</p>",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -57,7 +57,7 @@ func TestBuildRFC822PlainAndHTMLAlternative(t *testing.T) {
 		Subject:  "Hi",
 		Body:     "Plain",
 		BodyHTML: "<p>HTML</p>",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestBuildRFC822WithAttachment(t *testing.T) {
 		Attachments: []mailAttachment{
 			{Filename: "x.txt", MIMEType: "text/plain", Data: []byte("abc")},
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestBuildRFC822AlternativeWithAttachment(t *testing.T) {
 		Attachments: []mailAttachment{
 			{Filename: "x.txt", MIMEType: "text/plain", Data: []byte("abc")},
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -130,7 +130,7 @@ func TestBuildRFC822UTF8Subject(t *testing.T) {
 		To:      []string{"c@d.com"},
 		Subject: "Grüße",
 		Body:    "Hi",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -147,7 +147,7 @@ func TestBuildRFC822ReplyToHeader(t *testing.T) {
 		ReplyTo: "reply@example.com",
 		Subject: "Hi",
 		Body:    "Hello",
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestBuildRFC822AdditionalHeadersMessageIDIsNotDuplicated(t *testing.T) {
 		AdditionalHeaders: map[string]string{
 			"Message-ID": "<custom@id>",
 		},
-	})
+	}, nil)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestBuildRFC822ReplyToRejectsNewlines(t *testing.T) {
 		ReplyTo: "a@b.com\r\nBcc: evil@evil.com",
 		Subject: "Hi",
 		Body:    "Hello",
-	})
+	}, nil)
 	if err == nil {
 		t.Fatalf("expected error")
 	}

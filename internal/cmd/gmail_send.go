@@ -267,7 +267,7 @@ func sendGmailBatches(ctx context.Context, svc *gmail.Service, opts sendMessageO
 			InReplyTo:   reply.InReplyTo,
 			References:  reply.References,
 			Attachments: opts.Attachments,
-		})
+		}, nil)
 		if err != nil {
 			return nil, err
 		}

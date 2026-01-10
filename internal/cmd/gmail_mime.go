@@ -22,6 +22,10 @@ type mailAttachment struct {
 	Data     []byte
 }
 
+type rfc822Config struct {
+	allowMissingTo bool
+}
+
 type mailOptions struct {
 	From              string
 	To                []string
@@ -37,11 +41,13 @@ type mailOptions struct {
 	Attachments       []mailAttachment
 }
 
-func buildRFC822(opts mailOptions) ([]byte, error) {
+func buildRFC822(opts mailOptions, cfg *rfc822Config) ([]byte, error) {
+	allowMissingTo := cfg != nil && cfg.allowMissingTo
+
 	if strings.TrimSpace(opts.From) == "" {
 		return nil, errors.New("missing From")
 	}
-	if len(opts.To) == 0 {
+	if len(opts.To) == 0 && !allowMissingTo {
 		return nil, errors.New("missing To")
 	}
 	if strings.TrimSpace(opts.Subject) == "" {
@@ -60,7 +66,9 @@ func buildRFC822(opts mailOptions) ([]byte, error) {
 	}
 
 	writeHeader(&b, "From", opts.From)
-	writeHeader(&b, "To", strings.Join(opts.To, ", "))
+	if len(opts.To) > 0 {
+		writeHeader(&b, "To", strings.Join(opts.To, ", "))
+	}
 	if len(opts.Cc) > 0 {
 		writeHeader(&b, "Cc", strings.Join(opts.Cc, ", "))
 	}

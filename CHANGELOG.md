@@ -2,6 +2,10 @@
 
 ## 0.5.4 - 2026-01-10
 
+### Changed
+
+- Gmail: allow drafts without a recipient; drafts update preserves existing `To` when `--to` is omitted. (#57) — thanks @antons.
+
 ### Fixed
 
 - Paths: expand leading `~` in user-provided file paths (e.g. `--out "~/Downloads/file.pdf"`). (#56) — thanks @salmonumbrella.

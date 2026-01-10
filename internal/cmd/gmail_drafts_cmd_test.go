@@ -323,6 +323,73 @@ func TestGmailDraftsCreateCmd_JSON(t *testing.T) {
 	}
 }
 
+func TestGmailDraftsCreateCmd_NoTo(t *testing.T) {
+	origNew := newGmailService
+	t.Cleanup(func() { newGmailService = origNew })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.Contains(r.URL.Path, "/gmail/v1/users/me/drafts") && r.Method == http.MethodPost {
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("ReadAll: %v", err)
+			}
+			var draft gmail.Draft
+			if unmarshalErr := json.Unmarshal(body, &draft); unmarshalErr != nil {
+				t.Fatalf("unmarshal: %v body=%q", unmarshalErr, string(body))
+			}
+			if draft.Message == nil {
+				t.Fatalf("expected message in create")
+			}
+			raw, err := base64.RawURLEncoding.DecodeString(draft.Message.Raw)
+			if err != nil {
+				t.Fatalf("decode raw: %v", err)
+			}
+			s := string(raw)
+			if strings.Contains(s, "\r\nTo:") {
+				t.Fatalf("unexpected To header in raw:\n%s", s)
+			}
+			if !strings.Contains(s, "Subject: S\r\n") {
+				t.Fatalf("missing Subject in raw:\n%s", s)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "d1",
+				"message": map[string]any{
+					"id": "m1",
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer srv.Close()
+
+	svc, err := gmail.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newGmailService = func(context.Context, string) (*gmail.Service, error) { return svc, nil }
+
+	flags := &RootFlags{Account: "a@b.com"}
+
+	_ = captureStdout(t, func() {
+		u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
+		if uiErr != nil {
+			t.Fatalf("ui.New: %v", uiErr)
+		}
+		ctx := ui.WithUI(context.Background(), u)
+		ctx = outfmt.WithMode(ctx, outfmt.Mode{JSON: true})
+
+		if err := runKong(t, &GmailDraftsCreateCmd{}, []string{"--subject", "S", "--body", "Hello"}, ctx, flags); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+	})
+}
+
 func TestGmailDraftsCreateCmd_WithFromAndReply(t *testing.T) {
 	origNew := newGmailService
 	t.Cleanup(func() { newGmailService = origNew })
@@ -540,4 +607,105 @@ func TestGmailDraftsUpdateCmd_JSON(t *testing.T) {
 	if parsed.DraftID != "d1" || parsed.ThreadID != "t1" {
 		t.Fatalf("unexpected json: %#v", parsed)
 	}
+}
+
+func TestGmailDraftsUpdateCmd_PreservesToWhenNotProvided(t *testing.T) {
+	origNew := newGmailService
+	t.Cleanup(func() { newGmailService = origNew })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.Contains(r.URL.Path, "/gmail/v1/users/me/drafts/d1") && r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "d1",
+				"message": map[string]any{
+					"id":       "m1",
+					"threadId": "t1",
+					"payload": map[string]any{
+						"headers": []map[string]any{
+							{"name": "To", "value": "keep@example.com"},
+						},
+					},
+				},
+			})
+			return
+		case strings.Contains(r.URL.Path, "/gmail/v1/users/me/threads/t1") && r.Method == http.MethodGet:
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id": "t1",
+				"messages": []map[string]any{
+					{
+						"id":       "m1",
+						"threadId": "t1",
+						"payload": map[string]any{
+							"headers": []map[string]any{
+								{"name": "Message-ID", "value": "<m1@example.com>"},
+							},
+						},
+					},
+				},
+			})
+			return
+		case strings.Contains(r.URL.Path, "/gmail/v1/users/me/drafts/d1") && r.Method == http.MethodPut:
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				t.Fatalf("ReadAll: %v", err)
+			}
+			var draft gmail.Draft
+			if unmarshalErr := json.Unmarshal(body, &draft); unmarshalErr != nil {
+				t.Fatalf("unmarshal: %v body=%q", unmarshalErr, string(body))
+			}
+			if draft.Message == nil {
+				t.Fatalf("expected message in update")
+			}
+			raw, err := base64.RawURLEncoding.DecodeString(draft.Message.Raw)
+			if err != nil {
+				t.Fatalf("decode raw: %v", err)
+			}
+			s := string(raw)
+			if !strings.Contains(s, "To: keep@example.com\r\n") {
+				t.Fatalf("expected preserved To in raw:\n%s", s)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"id":      "d1",
+				"message": map[string]any{"id": "m2", "threadId": "t1"},
+			})
+			return
+		default:
+			http.NotFound(w, r)
+			return
+		}
+	}))
+	defer srv.Close()
+
+	svc, err := gmail.NewService(context.Background(),
+		option.WithoutAuthentication(),
+		option.WithHTTPClient(srv.Client()),
+		option.WithEndpoint(srv.URL+"/"),
+	)
+	if err != nil {
+		t.Fatalf("NewService: %v", err)
+	}
+	newGmailService = func(context.Context, string) (*gmail.Service, error) { return svc, nil }
+
+	flags := &RootFlags{Account: "a@b.com"}
+
+	_ = captureStdout(t, func() {
+		u, uiErr := ui.New(ui.Options{Stdout: io.Discard, Stderr: io.Discard, Color: "never"})
+		if uiErr != nil {
+			t.Fatalf("ui.New: %v", uiErr)
+		}
+		ctx := ui.WithUI(context.Background(), u)
+		ctx = outfmt.WithMode(ctx, outfmt.Mode{JSON: true})
+
+		if err := runKong(t, &GmailDraftsUpdateCmd{}, []string{
+			"d1",
+			"--subject", "Updated",
+			"--body", "Hello",
+		}, ctx, flags); err != nil {
+			t.Fatalf("execute: %v", err)
+		}
+	})
 }
