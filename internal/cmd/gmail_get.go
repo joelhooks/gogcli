@@ -89,6 +89,10 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 			if body := bestBodyText(msg.Payload); body != "" {
 				payload["body"] = body
 			}
+			attachments := collectAttachments(msg.Payload)
+			if len(attachments) > 0 {
+				payload["attachments"] = attachments
+			}
 		}
 		return outfmt.WriteJSON(os.Stdout, payload)
 	}
@@ -119,6 +123,15 @@ func (c *GmailGetCmd) Run(ctx context.Context, flags *RootFlags) error {
 			u.Out().Printf("unsubscribe\t%s", unsubscribe)
 		}
 		if format == gmailFormatFull {
+			attachments := collectAttachments(msg.Payload)
+			if len(attachments) > 0 {
+				u.Out().Println("")
+				u.Out().Println("attachments:")
+				for _, a := range attachments {
+					u.Out().Printf("  %s (%d bytes, %s)", a.Filename, a.Size, a.MimeType)
+					u.Out().Printf("    attachment_id\t%s", a.AttachmentID)
+				}
+			}
 			body := bestBodyText(msg.Payload)
 			if body != "" {
 				u.Out().Println("")
