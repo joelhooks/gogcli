@@ -8,7 +8,7 @@ Fast, script-friendly CLI for Gmail, Calendar, Chat, Classroom, Drive, Docs, Sli
 - **Email tracking** - track opens for `gog gmail send --track` with a small Cloudflare Worker backend
 - **Calendar** - list/create/update events, detect conflicts, manage invitations, check free/busy status, team calendars, propose new times, focus/OOO/working-location events, recurrence + reminders
 - **Classroom** - manage courses, roster, coursework/materials, submissions, announcements, topics, invitations, guardians, profiles
-- **Chat** - list spaces, read messages/threads, send messages and DMs (Workspace-only)
+- **Chat** - list/find/create spaces, list messages/threads (filter by thread/unread), send messages and DMs (Workspace-only)
 - **Drive** - list/search/upload/download files, manage permissions/comments, organize folders, list shared drives
 - **Contacts** - search/create/update contacts, access Workspace directory/other contacts
 - **Tasks** - manage tasklists and tasks: get/create/add/update/done/undo/delete/clear, repeat schedules
@@ -828,6 +828,8 @@ gog chat spaces create "Engineering" --member alice@company.com --member bob@com
 
 # Messages
 gog chat messages list spaces/<spaceId> --max 5
+gog chat messages list spaces/<spaceId> --thread <threadId>
+gog chat messages list spaces/<spaceId> --unread
 gog chat messages send spaces/<spaceId> --text "Build complete!" --thread spaces/<spaceId>/threads/<threadId>
 
 # Threads
@@ -837,6 +839,8 @@ gog chat threads list spaces/<spaceId>
 gog chat dm space user@company.com
 gog chat dm send user@company.com --text "ping"
 ```
+
+Note: Chat commands require a Google Workspace account (consumer @gmail.com accounts are not supported).
 
 ### Groups (Google Workspace)
 
