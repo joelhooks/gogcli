@@ -122,9 +122,10 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 	sem := make(chan struct{}, maxConcurrency)
 
 	type result struct {
-		index int
-		item  messageItem
-		err   error
+		index     int
+		messageID string
+		item      messageItem
+		err       error
 	}
 
 	results := make(chan result, len(messages))
@@ -142,7 +143,7 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 			case sem <- struct{}{}:
 				defer func() { <-sem }()
 			case <-ctx.Done():
-				results <- result{index: idx, err: ctx.Err()}
+				results <- result{index: idx, messageID: messageID, err: ctx.Err()}
 				return
 			}
 
@@ -154,7 +155,7 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 			}
 			msg, err := call.Context(ctx).Do()
 			if err != nil {
-				results <- result{index: idx, err: err}
+				results <- result{index: idx, messageID: messageID, err: fmt.Errorf("message %s: %w", messageID, err)}
 				return
 			}
 
@@ -182,7 +183,7 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 				item.Labels = names
 			}
 
-			results <- result{index: idx, item: item}
+			results <- result{index: idx, messageID: messageID, item: item}
 		}(i, m.Id)
 	}
 
@@ -192,31 +193,19 @@ func fetchMessageDetails(ctx context.Context, svc *gmail.Service, messages []*gm
 	}()
 
 	ordered := make([]messageItem, len(messages))
-	hasErr := false
+	var firstErr error
 	for r := range results {
 		if r.err != nil {
-			hasErr = true
+			if firstErr == nil {
+				firstErr = r.err
+			}
 			ordered[r.index] = messageItem{}
 			continue
 		}
 		ordered[r.index] = r.item
 	}
-	if hasErr {
-		for _, m := range messages {
-			if m == nil || m.Id == "" {
-				continue
-			}
-			call := svc.Users.Messages.Get("me", m.Id)
-			if includeBody {
-				call = call.Format("full")
-			} else {
-				call = call.Format("metadata").MetadataHeaders("From", "Subject", "Date")
-			}
-			_, err := call.Context(ctx).Do()
-			if err != nil {
-				return nil, err
-			}
-		}
+	if firstErr != nil {
+		return nil, firstErr
 	}
 
 	items := make([]messageItem, 0, len(ordered))
@@ -239,5 +228,19 @@ func sanitizeMessageBody(body string) string {
 	body = strings.ReplaceAll(body, "\n", " ")
 	body = strings.ReplaceAll(body, "\r", " ")
 	body = strings.TrimSpace(body)
-	return truncate(body, 200)
+	return truncateRunes(body, 200)
+}
+
+func truncateRunes(s string, maxLen int) string {
+	if maxLen <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= maxLen {
+		return s
+	}
+	if maxLen <= 3 {
+		return string(runes[:maxLen])
+	}
+	return string(runes[:maxLen-3]) + "..."
 }

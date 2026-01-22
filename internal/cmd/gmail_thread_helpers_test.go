@@ -170,6 +170,22 @@ func TestFindPartBody_DecodesBase64Transfer(t *testing.T) {
 	}
 }
 
+func TestDecodeTransferEncoding_Base64Whitespace(t *testing.T) {
+	encoded := []byte("cGxhaW4gYm9keQ==\n")
+	got := decodeTransferEncoding(encoded, "base64")
+	if string(got) != "plain body" {
+		t.Fatalf("unexpected decoded body: %q", got)
+	}
+}
+
+func TestDecodeBodyCharset_ISO88591(t *testing.T) {
+	input := []byte{0x63, 0x61, 0x66, 0xe9} // "café" in ISO-8859-1
+	got := decodeBodyCharset(input, "text/plain; charset=iso-8859-1")
+	if string(got) != "café" {
+		t.Fatalf("unexpected decoded charset: %q", string(got))
+	}
+}
+
 func TestMimeTypeMatches(t *testing.T) {
 	if !mimeTypeMatches("Text/Plain; charset=UTF-8", "text/plain") {
 		t.Fatalf("expected mime match")

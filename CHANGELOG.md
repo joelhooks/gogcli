@@ -8,6 +8,7 @@
 - People: profile lookup, directory search, and relations commands. (#84) — thanks @salmonumbrella.
 - Calendar: show event timezone and local times; add --weekday output. (#92) — thanks @salmonumbrella.
 - Gmail: show thread message count in search output. (#99) — thanks @jeanregisser.
+- Gmail: message-level search with optional body decoding. (#88) — thanks @mbelinky.
 
 ### Fixed
 
