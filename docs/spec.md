@@ -175,7 +175,7 @@ Flag aliases:
 - `gog drive download <fileId> [--out PATH] [--format F]` (`--format` only applies to Google Workspace files)
 - `gog drive upload <localPath> [--name N] [--parent ID] [--convert] [--convert-to doc|sheet|slides]`
 - `gog drive mkdir <name> [--parent ID]`
-- `gog drive delete <fileId>`
+- `gog drive delete <fileId> [--permanent]`
 - `gog drive move <fileId> --parent ID`
 - `gog drive rename <fileId> <newName>`
 - `gog drive share <fileId> --to anyone|user|domain [--email addr] [--domain example.com] [--role reader|writer] [--discoverable]`

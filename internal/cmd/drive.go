@@ -569,29 +569,32 @@ func (c *DriveDeleteCmd) Run(ctx context.Context, flags *RootFlags) error {
 		return err
 	}
 
+	trashed := !c.Permanent
+	deleted := c.Permanent
+
 	if c.Permanent {
 		if err := svc.Files.Delete(fileID).SupportsAllDrives(true).Context(ctx).Do(); err != nil {
 			return err
 		}
 	} else {
 		_, err := svc.Files.Update(fileID, &drive.File{Trashed: true}).
-			SupportsAllDrives(true).Context(ctx).Do()
+			SupportsAllDrives(true).
+			Fields("id, trashed").
+			Context(ctx).
+			Do()
 		if err != nil {
 			return err
 		}
 	}
 	if outfmt.IsJSON(ctx) {
 		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
-			"trashed":   !c.Permanent,
-			"deleted":   c.Permanent,
-			"id":        fileID,
+			"trashed": trashed,
+			"deleted": deleted,
+			"id":      fileID,
 		})
 	}
-	if c.Permanent {
-		u.Out().Printf("deleted\ttrue")
-	} else {
-		u.Out().Printf("trashed\ttrue")
-	}
+	u.Out().Printf("trashed\t%t", trashed)
+	u.Out().Printf("deleted\t%t", deleted)
 	u.Out().Printf("id\t%s", fileID)
 	return nil
 }

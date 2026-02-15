@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -66,6 +67,9 @@ func TestExecute_DriveMoreCommands_JSON(t *testing.T) {
 			return
 		case strings.Contains(path, "/files/id1") && (r.Method == http.MethodPatch || r.Method == http.MethodPut):
 			w.Header().Set("Content-Type", "application/json")
+			if got := r.URL.Query().Get("supportsAllDrives"); got != "true" {
+				t.Fatalf("expected supportsAllDrives=true, got: %q (raw=%q)", got, r.URL.RawQuery)
+			}
 			if addParents := r.URL.Query().Get("addParents"); addParents != "" {
 				if addParents != "np" {
 					t.Fatalf("expected addParents=np, got: %q", r.URL.RawQuery)
@@ -78,6 +82,14 @@ func TestExecute_DriveMoreCommands_JSON(t *testing.T) {
 					"name":        "New",
 					"parents":     []string{"np"},
 					"webViewLink": "https://example.com/id1",
+				})
+				return
+			}
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "\"trashed\":true") {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":      "id1",
+					"trashed": true,
 				})
 				return
 			}
@@ -234,6 +246,17 @@ func TestExecute_DriveMoreCommands_Text(t *testing.T) {
 			return
 		case strings.Contains(path, "/files/id1") && (r.Method == http.MethodPatch || r.Method == http.MethodPut):
 			w.Header().Set("Content-Type", "application/json")
+			if got := r.URL.Query().Get("supportsAllDrives"); got != "true" {
+				t.Fatalf("expected supportsAllDrives=true, got: %q (raw=%q)", got, r.URL.RawQuery)
+			}
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "\"trashed\":true") {
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id":      "id1",
+					"trashed": true,
+				})
+				return
+			}
 			_ = json.NewEncoder(w).Encode(map[string]any{
 				"id":          "id1",
 				"name":        "New",

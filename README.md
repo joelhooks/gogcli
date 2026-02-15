@@ -825,10 +825,11 @@ gog drive mkdir "New Folder" --parent <parentFolderId>
 gog drive rename <fileId> "New Name"
 gog drive move <fileId> --parent <destinationFolderId>
 gog drive delete <fileId>             # Move to trash
+gog drive delete <fileId> --permanent # Permanently delete
 
-	# Permissions
-	gog drive permissions <fileId>
-	gog drive share <fileId> --to user --email user@example.com --role reader
+# Permissions
+gog drive permissions <fileId>
+gog drive share <fileId> --to user --email user@example.com --role reader
 	gog drive share <fileId> --to user --email user@example.com --role writer
 	gog drive unshare <fileId> --permission-id <permissionId>
 
