@@ -60,7 +60,7 @@ var keySpecs = map[Key]KeySpec{
 			cfg.KeyringBackend = ""
 		},
 		EmptyHint: func() string {
-			return "(not set, using auto)"
+			return "(not set; default: auto on interactive TTY, file on headless/CI/SSH)"
 		},
 	},
 }

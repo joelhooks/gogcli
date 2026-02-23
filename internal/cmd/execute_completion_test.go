@@ -14,7 +14,7 @@ func TestExecute_Completion_Bash(t *testing.T) {
 	}
 	os.Stdout = f
 	_ = captureStderr(t, func() {
-		if execErr := Execute([]string{"completion", "bash"}); execErr != nil {
+		if execErr := Execute([]string{"--plain", "completion", "bash"}); execErr != nil {
 			t.Fatalf("Execute: %v", execErr)
 		}
 	})

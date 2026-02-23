@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 )
 
@@ -99,5 +100,58 @@ func TestFromContext_WrongType(t *testing.T) {
 	ctx := context.WithValue(context.Background(), ctxKey{}, "nope")
 	if got := FromContext(ctx); got != (Mode{}) {
 		t.Fatalf("expected zero mode, got %#v", got)
+	}
+}
+
+func TestWriteJSON_WithEnvelope(t *testing.T) {
+	ctx := context.Background()
+	ctx = WithEnvelope(ctx, true)
+	ctx = WithCommand(ctx, "gog version")
+	ctx = WithNextActions(ctx, []NextAction{
+		{Command: "gog schema version", Description: "Inspect command schema"},
+	})
+
+	var buf bytes.Buffer
+	if err := WriteJSON(ctx, &buf, map[string]any{"version": "1.2.3"}); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	raw := strings.TrimSpace(buf.String())
+	if !strings.Contains(raw, `"ok": true`) || !strings.Contains(raw, `"command": "gog version"`) {
+		t.Fatalf("expected envelope output, got: %s", raw)
+	}
+	if !strings.Contains(raw, `"next_actions"`) {
+		t.Fatalf("expected next_actions in envelope, got: %s", raw)
+	}
+}
+
+func TestWriteJSON_DoesNotDoubleWrapEnvelope(t *testing.T) {
+	ctx := WithEnvelope(context.Background(), true)
+	var buf bytes.Buffer
+
+	input := map[string]any{
+		"ok":      false,
+		"command": "gog x",
+		"error": map[string]any{
+			"message": "boom",
+			"code":    "COMMAND_FAILED",
+		},
+		"fix":          "do x",
+		"next_actions": []map[string]any{},
+	}
+
+	if err := WriteJSON(ctx, &buf, input); err != nil {
+		t.Fatalf("WriteJSON: %v", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if out["ok"] != false {
+		t.Fatalf("expected error envelope passthrough, got %#v", out)
+	}
+	if out["command"] != "gog x" {
+		t.Fatalf("expected command passthrough, got %#v", out["command"])
 	}
 }

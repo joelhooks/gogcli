@@ -49,6 +49,7 @@ func keyringItem(key string, data []byte) keyring.Item {
 const (
 	keyringPasswordEnv = "GOG_KEYRING_PASSWORD" //nolint:gosec // env var name, not a credential
 	keyringBackendEnv  = "GOG_KEYRING_BACKEND"  //nolint:gosec // env var name, not a credential
+	keyringHeadlessEnv = "GOG_HEADLESS"         //nolint:gosec // env var name, not a credential
 )
 
 var (
@@ -90,7 +91,23 @@ func ResolveKeyringBackendInfo() (KeyringBackendInfo, error) {
 		}
 	}
 
-	return KeyringBackendInfo{Value: keyringBackendAuto, Source: keyringBackendSourceDefault}, nil
+	return KeyringBackendInfo{Value: defaultKeyringBackend(), Source: keyringBackendSourceDefault}, nil
+}
+
+func defaultKeyringBackend() string {
+	if envBool(keyringHeadlessEnv) || envBool("CI") {
+		return "file"
+	}
+
+	if strings.TrimSpace(os.Getenv("SSH_CONNECTION")) != "" || strings.TrimSpace(os.Getenv("SSH_TTY")) != "" {
+		return "file"
+	}
+
+	if !term.IsTerminal(int(os.Stdin.Fd())) || !term.IsTerminal(int(os.Stdout.Fd())) {
+		return "file"
+	}
+
+	return keyringBackendAuto
 }
 
 func allowedBackends(info KeyringBackendInfo) ([]keyring.BackendType, error) {
@@ -141,6 +158,16 @@ func fileKeyringPasswordFunc() keyring.PromptFunc {
 
 func normalizeKeyringBackend(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func envBool(key string) bool {
+	v := strings.TrimSpace(strings.ToLower(os.Getenv(key)))
+	switch v {
+	case "1", "true", "yes", "y", "on":
+		return true
+	default:
+		return false
+	}
 }
 
 // keyringOpenTimeout is the maximum time to wait for keyring.Open() to complete.

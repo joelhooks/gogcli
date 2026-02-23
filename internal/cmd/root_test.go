@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -25,14 +26,22 @@ func TestExecute_Help(t *testing.T) {
 			}
 		})
 	})
-	if !strings.Contains(out, "Google CLI") && !strings.Contains(out, "Usage:") {
-		t.Fatalf("unexpected help output: %q", out)
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("expected JSON output, got error=%v output=%q", err, out)
 	}
-	if !strings.Contains(out, "config.json") || !strings.Contains(out, "keyring backend") {
-		t.Fatalf("expected config info in help output: %q", out)
+
+	if payload["ok"] != true {
+		t.Fatalf("expected ok=true envelope, got: %#v", payload)
 	}
-	if strings.Contains(out, "gmail (mail,email) thread get") {
-		t.Fatalf("expected collapsed help (no expanded subcommands), got: %q", out)
+
+	result, ok := payload["result"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected result object, got: %#v", payload["result"])
+	}
+	if _, ok := result["commands"]; !ok {
+		t.Fatalf("expected command tree in result, got: %#v", result)
 	}
 }
 
@@ -61,29 +70,50 @@ func TestExecute_Help_GmailHasGroupsAndRelativeCommands(t *testing.T) {
 	}
 }
 
+func TestExecute_NoArgs_ReturnsRootCommandTree(t *testing.T) {
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
+			if err := Execute(nil); err != nil {
+				t.Fatalf("Execute: %v", err)
+			}
+		})
+	})
+
+	var payload map[string]any
+	if err := json.Unmarshal([]byte(out), &payload); err != nil {
+		t.Fatalf("expected JSON output, got error=%v output=%q", err, out)
+	}
+	if payload["ok"] != true {
+		t.Fatalf("expected ok=true envelope, got: %#v", payload)
+	}
+	if payload["command"] != "gog" {
+		t.Fatalf("expected command=gog, got: %#v", payload["command"])
+	}
+}
+
 func TestExecute_UnknownCommand(t *testing.T) {
-	errText := captureStderr(t, func() {
-		_ = captureStdout(t, func() {
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
 			if err := Execute([]string{"no_such_cmd"}); err == nil {
 				t.Fatalf("expected error")
 			}
 		})
 	})
-	if errText == "" {
-		t.Fatalf("expected stderr output")
+	if !strings.Contains(out, `"ok": false`) || !strings.Contains(out, `"error"`) {
+		t.Fatalf("expected JSON error envelope, got: %q", out)
 	}
 }
 
 func TestExecute_UnknownFlag(t *testing.T) {
-	errText := captureStderr(t, func() {
-		_ = captureStdout(t, func() {
+	out := captureStdout(t, func() {
+		_ = captureStderr(t, func() {
 			if err := Execute([]string{"--definitely-nope"}); err == nil {
 				t.Fatalf("expected error")
 			}
 		})
 	})
-	if errText == "" {
-		t.Fatalf("expected stderr output")
+	if !strings.Contains(out, `"ok": false`) || !strings.Contains(out, `"error"`) {
+		t.Fatalf("expected JSON error envelope, got: %q", out)
 	}
 }
 

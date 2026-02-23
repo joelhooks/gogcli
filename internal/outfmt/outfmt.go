@@ -80,12 +80,18 @@ func JSONTransformFromContext(ctx context.Context) (JSONTransform, bool) {
 }
 
 func WriteJSON(ctx context.Context, w io.Writer, v any) error {
+	transformedApplied := false
 	if t, ok := JSONTransformFromContext(ctx); ok && (t.ResultsOnly || len(t.Select) > 0) {
 		transformed, err := applyJSONTransform(v, t)
 		if err != nil {
 			return fmt.Errorf("transform json: %w", err)
 		}
 		v = transformed
+		transformedApplied = true
+	}
+
+	if !transformedApplied && EnvelopeEnabledFromContext(ctx) {
+		v = wrapSuccessEnvelope(ctx, v)
 	}
 
 	enc := json.NewEncoder(w)
@@ -97,6 +103,55 @@ func WriteJSON(ctx context.Context, w io.Writer, v any) error {
 	}
 
 	return nil
+}
+
+func wrapSuccessEnvelope(ctx context.Context, v any) any {
+	if isEnvelope(v) {
+		return v
+	}
+
+	cmd := strings.TrimSpace(CommandFromContext(ctx))
+	if cmd == "" {
+		cmd = "gog"
+	}
+
+	actions := NextActionsFromContext(ctx)
+	if actions == nil {
+		actions = []NextAction{}
+	}
+
+	return SuccessEnvelope{
+		Ok:          true,
+		Command:     cmd,
+		Result:      v,
+		NextActions: actions,
+	}
+}
+
+func isEnvelope(v any) bool {
+	m, ok := v.(map[string]any)
+	if !ok {
+		return false
+	}
+
+	rawOK, hasOK := m["ok"]
+	if !hasOK {
+		return false
+	}
+
+	_, okBool := rawOK.(bool)
+	if !okBool {
+		return false
+	}
+
+	_, hasCommand := m["command"]
+	if !hasCommand {
+		return false
+	}
+
+	_, hasResult := m["result"]
+	_, hasError := m["error"]
+	return hasResult || hasError
 }
 
 func applyJSONTransform(v any, t JSONTransform) (any, error) {

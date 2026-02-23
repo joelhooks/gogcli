@@ -4,17 +4,27 @@ import (
 	"context"
 	"fmt"
 	"os"
+
+	"github.com/steipete/gogcli/internal/outfmt"
 )
 
 type CompletionCmd struct {
 	Shell string `arg:"" name:"shell" help:"Shell (bash|zsh|fish|powershell)" enum:"bash,zsh,fish,powershell"`
 }
 
-func (c *CompletionCmd) Run(_ context.Context) error {
+func (c *CompletionCmd) Run(ctx context.Context) error {
 	script, err := completionScript(c.Shell)
 	if err != nil {
 		return err
 	}
+
+	if outfmt.IsJSON(ctx) {
+		return outfmt.WriteJSON(ctx, os.Stdout, map[string]any{
+			"shell":  c.Shell,
+			"script": script,
+		})
+	}
+
 	_, err = fmt.Fprint(os.Stdout, script)
 	return err
 }

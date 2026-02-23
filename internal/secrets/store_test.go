@@ -39,8 +39,9 @@ func TestResolveKeyringBackendInfo_Default(t *testing.T) {
 		t.Fatalf("ResolveKeyringBackendInfo: %v", err)
 	}
 
-	if info.Value != "auto" {
-		t.Fatalf("expected auto, got %q", info.Value)
+	want := defaultKeyringBackend()
+	if info.Value != want {
+		t.Fatalf("expected %q, got %q", want, info.Value)
 	}
 
 	if info.Source != keyringBackendSourceDefault {
